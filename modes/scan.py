@@ -23,50 +23,45 @@ def scan(target, paramData, encoding, headers, delay, timeout, skipDOM, skip):
     # If the user hasn't supplied the root url with http(s), we will handle it
     if not target.startswith('http'):
         try:
-            response = requester('https://' + target, {},
-                                 headers, GET, delay, timeout)
-            target = 'https://' + target
+            response = requester(f'https://{target}', {}, headers, GET, delay, timeout)
+            target = f'https://{target}'
         except:
-            target = 'http://' + target
-    logger.debug('Scan target: {}'.format(target))
+            target = f'http://{target}'
+    logger.debug(f'Scan target: {target}')
     response = requester(target, {}, headers, GET, delay, timeout).text
 
     if not skipDOM:
         logger.run('Checking for DOM vulnerabilities')
-        highlighted = dom(response)
-        if highlighted:
+        if highlighted := dom(response):
             logger.good('Potentially vulnerable objects found')
             logger.red_line(level='good')
             for line in highlighted:
                 logger.no_format(line, level='good')
             logger.red_line(level='good')
     host = urlparse(target).netloc  # Extracts host out of the url
-    logger.debug('Host to scan: {}'.format(host))
+    logger.debug(f'Host to scan: {host}')
     url = getUrl(target, GET)
-    logger.debug('Url to scan: {}'.format(url))
+    logger.debug(f'Url to scan: {url}')
     params = getParams(target, paramData, GET)
     logger.debug_json('Scan parameters:', params)
     if not params:
         logger.error('No parameters to test.')
         quit()
-    WAF = wafDetector(
-        url, {list(params.keys())[0]: xsschecker}, headers, GET, delay, timeout)
-    if WAF:
-        logger.error('WAF detected: %s%s%s' % (green, WAF, end))
+    if WAF := wafDetector(
+        url, {list(params.keys())[0]: xsschecker}, headers, GET, delay, timeout
+    ):
+        logger.error(f'WAF detected: {green}{WAF}{end}')
     else:
-        logger.good('WAF Status: %sOffline%s' % (green, end))
+        logger.good(f'WAF Status: {green}Offline{end}')
 
     for paramName in params.keys():
         paramsCopy = copy.deepcopy(params)
-        logger.info('Testing parameter: %s' % paramName)
-        if encoding:
-            paramsCopy[paramName] = encoding(xsschecker)
-        else:
-            paramsCopy[paramName] = xsschecker
+        logger.info(f'Testing parameter: {paramName}')
+        paramsCopy[paramName] = encoding(xsschecker) if encoding else xsschecker
         response = requester(url, paramsCopy, headers, GET, delay, timeout)
         occurences = htmlParser(response, encoding)
         positions = occurences.keys()
-        logger.debug('Scan occurences: {}'.format(occurences))
+        logger.debug(f'Scan occurences: {occurences}')
         if not occurences:
             logger.error('No reflection found')
             continue
@@ -76,12 +71,10 @@ def scan(target, paramData, encoding, headers, delay, timeout, skipDOM, skip):
         logger.run('Analysing reflections')
         efficiencies = filterChecker(
             url, paramsCopy, headers, GET, delay, occurences, timeout, encoding)
-        logger.debug('Scan efficiencies: {}'.format(efficiencies))
+        logger.debug(f'Scan efficiencies: {efficiencies}')
         logger.run('Generating payloads')
         vectors = generator(occurences, response.text)
-        total = 0
-        for v in vectors.values():
-            total += len(v)
+        total = sum(len(v) for v in vectors.values())
         if total == 0:
             logger.error('No vectors were crafted.')
             continue
@@ -99,22 +92,21 @@ def scan(target, paramData, encoding, headers, delay, timeout, skipDOM, skip):
                 efficiencies = checker(
                     url, paramsCopy, headers, GET, delay, vect, positions, timeout, encoding)
                 if not efficiencies:
-                    for i in range(len(occurences)):
+                    for _ in range(len(occurences)):
                         efficiencies.append(0)
                 bestEfficiency = max(efficiencies)
                 if bestEfficiency == 100 or (vect[0] == '\\' and bestEfficiency >= 95):
                     logger.red_line()
-                    logger.good('Payload: %s' % loggerVector)
+                    logger.good(f'Payload: {loggerVector}')
                     logger.info('Efficiency: %i' % bestEfficiency)
                     logger.info('Confidence: %i' % confidence)
                     if not skip:
-                        choice = input(
-                            '%s Would you like to continue scanning? [y/N] ' % que).lower()
+                        choice = input(f'{que} Would you like to continue scanning? [y/N] ').lower()
                         if choice != 'y':
                             quit()
                 elif bestEfficiency > minEfficiency:
                     logger.red_line()
-                    logger.good('Payload: %s' % loggerVector)
+                    logger.good(f'Payload: {loggerVector}')
                     logger.info('Efficiency: %i' % bestEfficiency)
                     logger.info('Confidence: %i' % confidence)
         logger.no_format('')

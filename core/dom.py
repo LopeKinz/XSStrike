@@ -28,8 +28,9 @@ def dom(response):
                 pattern = re.finditer(sources, newLine)
                 for grp in pattern:
                     if grp:
-                        source = newLine[grp.start():grp.end()].replace(' ', '')
-                        if source:
+                        if source := newLine[grp.start() : grp.end()].replace(
+                            ' ', ''
+                        ):
                             if len(parts) > 1:
                                for part in parts:
                                     if source in part:
@@ -38,15 +39,20 @@ def dom(response):
                 for controlledVariable in controlledVariables:
                     allControlledVariables.add(controlledVariable)
                 for controlledVariable in allControlledVariables:
-                    matches = list(filter(None, re.findall(r'\b%s\b' % controlledVariable, line)))
-                    if matches:
+                    if matches := list(
+                        filter(
+                            None,
+                            re.findall(r'\b%s\b' % controlledVariable, line),
+                        )
+                    ):
                         sourceFound = True
                         line = re.sub(r'\b%s\b' % controlledVariable, yellow + controlledVariable + end, line)
                 pattern = re.finditer(sinks, newLine)
                 for grp in pattern:
                     if grp:
-                        sink = newLine[grp.start():grp.end()].replace(' ', '')
-                        if sink:
+                        if sink := newLine[grp.start() : grp.end()].replace(
+                            ' ', ''
+                        ):
                             line = line.replace(sink, red + sink + end)
                             sinkFound = True
                 if line != newLine:
@@ -54,7 +60,4 @@ def dom(response):
                 num += 1
         except MemoryError:
             pass
-    if sinkFound or sourceFound:
-        return highlighted
-    else:
-        return []
+    return highlighted if sinkFound or sourceFound else []
